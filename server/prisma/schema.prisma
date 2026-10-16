@@ -1,0 +1,124 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  DISPATCHER
+  DRIVER
+}
+
+enum VehicleStatus {
+  AVAILABLE
+  IN_TRANSIT
+  MAINTENANCE
+}
+
+enum OrderStatus {
+  PENDING
+  ASSIGNED
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+enum RouteStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  fullName      String    @map("full_name")
+  role          Role      @default(DISPATCHER)
+  phone         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  vehiclesAssigned Vehicle[] @relation("DriverVehicle")
+  routesCreated    Route[]   @relation("DispatcherRoutes")
+  routesDriven     Route[]   @relation("DriverRoutes")
+
+  @@map("users")
+}
+
+model Vehicle {
+  id              String        @id @default(uuid())
+  brand           String
+  licensePlate    String        @unique @map("license_plate")
+  capacityKg      Float         @map("capacity_kg")
+  volumeM3        Float         @map("volume_m3")
+  status          VehicleStatus @default(AVAILABLE)
+  currentDriverId String?       @map("current_driver_id")
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  currentDriver   User?         @relation("DriverVehicle", fields: [currentDriverId], references: [id])
+  routes          Route[]
+
+  @@map("vehicles")
+}
+
+model Order {
+  id               String      @id @default(uuid())
+  customerName     String      @map("customer_name")
+  customerPhone    String      @map("customer_phone")
+  deliveryAddress  String      @map("delivery_address")
+  latitude         Float
+  longitude        Float
+  weightKg         Float       @map("weight_kg")
+  volumeM3         Float       @map("volume_m3")
+  timeWindowStart  String?     @map("time_window_start")
+  timeWindowEnd    String?     @map("time_window_end")
+  status           OrderStatus @default(PENDING)
+  createdAt        DateTime    @default(now()) @map("created_at")
+
+  routePoint       RoutePoint?
+
+  @@index([status])
+  @@index([latitude, longitude])
+  @@map("orders")
+}
+
+model Route {
+  id                String      @id @default(uuid())
+  routeDate         DateTime    @default(now()) @map("route_date")
+  status            RouteStatus @default(DRAFT)
+  totalDistanceKm   Float       @default(0.0) @map("total_distance_km")
+  totalDurationMin  Int         @default(0) @map("total_duration_min")
+  polylineGeometry  String?     @map("polyline_geometry") @db.Text
+  vehicleId         String      @map("vehicle_id")
+  driverId          String      @map("driver_id")
+  dispatcherId      String      @map("dispatcher_id")
+  createdAt         DateTime    @default(now()) @map("created_at")
+
+  vehicle           Vehicle     @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  driver            User        @relation("DriverRoutes", fields: [driverId], references: [id], onDelete: Restrict)
+  dispatcher        User        @relation("DispatcherRoutes", fields: [dispatcherId], references: [id], onDelete: Restrict)
+  routePoints       RoutePoint[]
+
+  @@index([status, routeDate])
+  @@map("routes")
+}
+
+model RoutePoint {
+  id               String    @id @default(uuid())
+  routeId          String    @map("route_id")
+  orderId          String    @unique @map("order_id")
+  stopSequence     Int       @map("stop_sequence")
+  estimatedArrival DateTime? @map("estimated_arrival")
+  actualArrival    DateTime? @map("actual_arrival")
+
+  route            Route     @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  order            Order     @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([routeId, stopSequence])
+  @@map("route_points")
+}
