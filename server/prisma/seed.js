@@ -92,11 +92,11 @@ async function main() {
     await prisma.order.create({ data: o });
   }
 
-  console.log('Database successfully seeded with test data:');
-  console.log(`   - Dispatcher: dispatcher@logistics.by / password123`);
-  console.log(`   - Driver: driver@logistics.by / password123`);
-  console.log(`   - Vehicle: ${vehicle.brand} (${vehicle.licensePlate})`);
-  console.log(`   - Orders created: ${ordersData.length}`);
+  console.log('Database seeded successfully:');
+  console.log(`- Dispatcher: dispatcher@logistics.by / password123`);
+  console.log(`- Driver: driver@logistics.by / password123`);
+  console.log(`- Vehicle: ${vehicle.brand} (${vehicle.licensePlate})`);
+  console.log(`- Orders created: ${ordersData.length}`);
 }
 
 main()
