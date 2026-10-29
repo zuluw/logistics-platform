@@ -31,6 +31,10 @@ jobs:
 
       - name: Validate Prisma Schema
         run: npx prisma validate
+        env:
+          DATABASE_URL: "postgresql://mock:mock@localhost:5432/mock_db"
 
       - name: Generate Prisma Client
         run: npx prisma generate
+        env:
+          DATABASE_URL: "postgresql://mock:mock@localhost:5432/mock_db"
