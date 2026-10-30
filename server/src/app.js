@@ -7,6 +7,7 @@ import { ApiError } from './common/errors/apiError.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import authRoutes from './modules/auth/auth.routes.js';
 import ordersRoutes from './modules/orders/orders.routes.js';
+import vehiclesRoutes from './modules/vehicles/vehicles.routes.js';
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/orders', ordersRoutes);
+app.use('/api/vehicles', vehiclesRoutes);
 
 app.use((req, res, next) => {
   next(ApiError.notFound(`Route ${req.method} ${req.originalUrl} was not found`));
