@@ -1,6 +1,7 @@
 import { prisma } from '../../config/prisma.js';
 import { ApiError } from '../../common/errors/apiError.js';
 import { osrmService } from '../../services/osrm.service.js';
+import { socketService } from '../../services/socket.service.js';
 
 const ROUTE_INCLUDE = {
   vehicle: true,
@@ -120,10 +121,15 @@ export class RoutesService {
       return created;
     });
 
-    return prisma.route.findUnique({
+    const createdRoute = await prisma.route.findUnique({
       where: { id: route.id },
       include: ROUTE_INCLUDE,
     });
+
+    socketService.emitToDriver(driverId, 'route:assigned', createdRoute);
+    socketService.emitToDispatchers('route:created', createdRoute);
+
+    return createdRoute;
   }
 
   async getMyActiveRoute(driverId) {
@@ -208,6 +214,17 @@ export class RoutesService {
           });
         }
       }
+    });
+
+    const actualArrival = status === 'DELIVERED' ? new Date().toISOString() : null;
+    const isCompleted = status === 'DELIVERED';
+
+    socketService.emitToDispatchers('order:status_changed', {
+      routeId,
+      pointId,
+      status,
+      actualArrival,
+      isCompleted,
     });
 
     return prisma.route.findUnique({
