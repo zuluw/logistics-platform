@@ -9,6 +9,7 @@ import authRoutes from './modules/auth/auth.routes.js';
 import ordersRoutes from './modules/orders/orders.routes.js';
 import vehiclesRoutes from './modules/vehicles/vehicles.routes.js';
 import routesRoutes from './modules/routes/routes.routes.js';
+import analyticsRoutes from './modules/analytics/analytics.routes.js';
 
 const app = express();
 
@@ -25,6 +26,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/orders', ordersRoutes);
 app.use('/api/vehicles', vehiclesRoutes);
 app.use('/api/routes', routesRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 app.use((req, res, next) => {
   next(ApiError.notFound(`Route ${req.method} ${req.originalUrl} was not found`));
