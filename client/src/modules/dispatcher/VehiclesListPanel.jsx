@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Truck, User, CheckCircle2, Plus, Edit2, AlertCircle } from 'lucide-react';
+import { Truck, User, CheckCircle2, Plus, Edit2, AlertCircle, Download } from 'lucide-react';
+import { exportVehiclesToCsv } from '../../utils/exportCsv.js';
 import { Button } from '../../components/index.js';
 import { CreateVehicleModal } from './CreateVehicleModal.jsx';
 import { apiClient } from '../../api/client.js';
@@ -93,14 +94,27 @@ export function VehiclesListPanel({
             </span>
           </div>
 
-          <Button
-            size="sm"
-            onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 text-white text-xs py-1 px-2.5 h-8"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span>Add Vehicle</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => exportVehiclesToCsv(vehicles)}
+              className="flex items-center gap-1.5 text-xs py-1 px-2.5 h-8 text-zinc-700 hover:text-zinc-900 bg-white shadow-2xs border-zinc-300"
+              title="Export vehicles to CSV"
+            >
+              <Download className="h-3.5 w-3.5 text-zinc-500" />
+              <span>Export CSV</span>
+            </Button>
+
+            <Button
+              size="sm"
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 text-white text-xs py-1 px-2.5 h-8"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add Vehicle</span>
+            </Button>
+          </div>
         </div>
         <p className="text-xs text-zinc-500 mt-1">
           Select an available vehicle to plan and assign delivery routes.
@@ -250,7 +264,7 @@ export function VehiclesListPanel({
                     Max Payload: <strong className="text-zinc-900">{vehicle.capacityKg} kg</strong>
                   </div>
                   <div>
-                    Cargo Volume: <strong className="text-zinc-900">{vehicle.volumeM3} m3</strong>
+                    Cargo Volume: <strong className="text-zinc-900">{vehicle.volumeM3} m³</strong>
                   </div>
                 </div>
               </div>

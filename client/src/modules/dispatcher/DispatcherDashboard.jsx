@@ -31,6 +31,7 @@ export function DispatcherDashboard({ onBackToAdmin } = {}) {
   const [isCalculating, setIsCalculating] = useState(false);
   const [isCreatingRoute, setIsCreatingRoute] = useState(false);
   const [routeError, setRouteError] = useState(null);
+  const [lastCreatedRoute, setLastCreatedRoute] = useState(null);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -102,16 +103,17 @@ export function DispatcherDashboard({ onBackToAdmin } = {}) {
     setRouteError(null);
 
     try {
-      await createRoute({
+      const created = await createRoute({
         vehicleId: selectedVehicle.id,
         driverId,
         orderIds: selectedOrderIds,
       });
 
+      setLastCreatedRoute(created);
       setPreviewRoute(null);
       setSelectedOrderIds([]);
       setSelectedVehicleId(null);
-      setActiveTab('orders');
+      setActiveTab('routes');
     } catch (err) {
       setRouteError(err.message || 'Failed to confirm route');
     } finally {
@@ -297,6 +299,9 @@ export function DispatcherDashboard({ onBackToAdmin } = {}) {
                 isCalculating={isCalculating}
                 isCreating={isCreatingRoute}
                 error={routeError}
+                routes={routes}
+                lastCreatedRoute={lastCreatedRoute}
+                onDismissCreatedRoute={() => setLastCreatedRoute(null)}
                 onCalculateRoute={handleCalculateRoute}
                 onCreateRoute={handleCreateRoute}
                 onClearPreview={() => {

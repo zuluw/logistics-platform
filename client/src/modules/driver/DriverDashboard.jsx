@@ -596,7 +596,7 @@ export function DriverDashboard() {
                     Weight: {currentStop.order?.weightKg} kg
                   </span>
                   <span className="text-xs bg-white border border-zinc-200 px-2 py-0.5 rounded-md text-zinc-600 font-medium">
-                    Volume: {currentStop.order?.volumeM3} m3
+                    Volume: {currentStop.order?.volumeM3} m³
                   </span>
                 </div>
 

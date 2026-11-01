@@ -137,7 +137,7 @@ export function CreateVehicleModal({ isOpen, onClose, onSuccess }) {
             required
           />
           <Input
-            label="Cargo Volume (m3)"
+            label="Cargo Volume (m³)"
             name="volumeM3"
             type="number"
             min="0.1"

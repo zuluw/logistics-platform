@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Button, Input } from '../../components/index.js';
-import { Plus, Search, Filter, Package, CheckSquare, Square } from 'lucide-react';
+import { Plus, Search, Filter, Package, CheckSquare, Square, Download } from 'lucide-react';
+import { exportOrdersToCsv } from '../../utils/exportCsv.js';
 
 function getStatusBadge(status) {
   const styles = {
@@ -67,15 +68,28 @@ export function OrdersListPanel({
             </span>
           </div>
 
-          <Button
-            size="sm"
-            variant="primary"
-            onClick={onOpenCreateModal}
-            className="gap-1.5"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Add Order</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => exportOrdersToCsv(filteredOrders)}
+              className="gap-1.5 text-xs text-slate-700 hover:text-slate-900 bg-white shadow-2xs"
+              title="Export filtered orders to CSV"
+            >
+              <Download className="h-3.5 w-3.5 text-slate-500" />
+              <span>Export CSV</span>
+            </Button>
+
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={onOpenCreateModal}
+              className="gap-1.5"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add Order</span>
+            </Button>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
