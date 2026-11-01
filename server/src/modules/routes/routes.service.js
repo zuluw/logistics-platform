@@ -232,6 +232,64 @@ export class RoutesService {
       include: ROUTE_INCLUDE,
     });
   }
+
+  async reassignRouteVehicle(routeId, newVehicleId) {
+    const route = await prisma.route.findUnique({
+      where: { id: routeId },
+    });
+
+    if (!route) {
+      throw ApiError.notFound('Route not found');
+    }
+
+    if (route.vehicleId === newVehicleId) {
+      return prisma.route.findUnique({
+        where: { id: routeId },
+        include: ROUTE_INCLUDE,
+      });
+    }
+
+    const newVehicle = await prisma.vehicle.findUnique({
+      where: { id: newVehicleId },
+    });
+
+    if (!newVehicle) {
+      throw ApiError.notFound('Vehicle not found');
+    }
+
+    if (newVehicle.status !== 'AVAILABLE') {
+      throw ApiError.badRequest('New vehicle is not available');
+    }
+
+    await prisma.$transaction(async (tx) => {
+      if (route.vehicleId) {
+        await tx.vehicle.update({
+          where: { id: route.vehicleId },
+          data: { status: 'AVAILABLE' },
+        });
+      }
+
+      await tx.vehicle.update({
+        where: { id: newVehicleId },
+        data: { status: 'IN_TRANSIT' },
+      });
+
+      await tx.route.update({
+        where: { id: routeId },
+        data: { vehicleId: newVehicleId },
+      });
+    });
+
+    const updatedRoute = await prisma.route.findUnique({
+      where: { id: routeId },
+      include: ROUTE_INCLUDE,
+    });
+
+    socketService.emitToDriver(updatedRoute.driverId, 'route:vehicle_updated', updatedRoute);
+    socketService.emitToDispatchers('route:updated', updatedRoute);
+
+    return updatedRoute;
+  }
 }
 
 export const routesService = new RoutesService();

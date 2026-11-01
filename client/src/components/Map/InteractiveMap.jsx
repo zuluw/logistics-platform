@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import L from 'leaflet';
+import { useSocket } from '../../context/SocketContext.jsx';
 
 const MINSK_CENTER = [53.8961, 27.5503];
 
@@ -56,21 +57,68 @@ function createOrderIcon(status, isSelected, sequenceNumber) {
   });
 }
 
+function createDriverIcon(heading = 0) {
+  return L.divIcon({
+    className: 'custom-driver-live-marker',
+    html: `
+      <div style="position: relative; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+        <span style="position: absolute; width: 36px; height: 36px; border-radius: 50%; background-color: rgba(37, 99, 235, 0.35); animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></span>
+        <div style="position: relative; width: 32px; height: 32px; border-radius: 50%; background-color: #2563eb; color: #ffffff; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.5); border: 2.5px solid #ffffff; transform: rotate(${heading}deg); transition: transform 0.25s ease;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="12 2 19 21 12 17 5 21 12 2"/>
+          </svg>
+        </div>
+      </div>
+    `,
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+    popupAnchor: [0, -20],
+  });
+}
+
 export function InteractiveMap({
   orders = [],
   routes = [],
+  activeRoutes = null,
   previewRoute = null,
   warehouse = { latitude: 53.8961, longitude: 27.5503, name: 'Central Warehouse / Depot' },
   selectedOrderIds = [],
   onMapClick,
   className = '',
   focusRoute = null,
+  driverLocation = null,
+  centerCoords = null,
+  recenterTrigger = 0,
+  followDriver = false,
 }) {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersLayerRef = useRef(null);
   const routesLayerRef = useRef(null);
   const previewLayerRef = useRef(null);
+  const driversLayerRef = useRef(null);
+  const hasFittedRouteRef = useRef(false);
+
+  const { socket } = useSocket();
+  const [socketDriverLocations, setSocketDriverLocations] = useState(new Map());
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleLocationChanged = (data) => {
+      if (!data?.driverId || !data.latitude || !data.longitude) return;
+      setSocketDriverLocations((prev) => {
+        const next = new Map(prev);
+        next.set(data.driverId, data);
+        return next;
+      });
+    };
+
+    socket.on('driver:location_changed', handleLocationChanged);
+    return () => {
+      socket.off('driver:location_changed', handleLocationChanged);
+    };
+  }, [socket]);
 
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
@@ -79,20 +127,26 @@ export function InteractiveMap({
       center: MINSK_CENTER,
       zoom: 12,
       zoomControl: true,
+      attributionControl: false,
     });
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors',
       maxZoom: 19,
+      subdomains: ['a', 'b', 'c'],
+      updateWhenIdle: false,
+      updateWhenZooming: false,
+      keepBuffer: 8,
     }).addTo(map);
 
     const routesLayer = L.layerGroup().addTo(map);
     const previewLayer = L.layerGroup().addTo(map);
     const markersLayer = L.layerGroup().addTo(map);
+    const driversLayer = L.layerGroup().addTo(map);
 
     routesLayerRef.current = routesLayer;
     previewLayerRef.current = previewLayer;
     markersLayerRef.current = markersLayer;
+    driversLayerRef.current = driversLayer;
     mapInstanceRef.current = map;
 
     map.on('click', (e) => {
@@ -102,7 +156,18 @@ export function InteractiveMap({
       });
     });
 
+    const handleResize = () => {
+      map.invalidateSize();
+    };
+    window.addEventListener('resize', handleResize);
+
+    const invalidateTimer = setTimeout(() => {
+      map.invalidateSize();
+    }, 200);
+
     return () => {
+      clearTimeout(invalidateTimer);
+      window.removeEventListener('resize', handleResize);
       map.remove();
       mapInstanceRef.current = null;
     };
@@ -167,23 +232,34 @@ export function InteractiveMap({
     });
   }, [orders, warehouse, selectedOrderIds, previewRoute]);
 
+  const displayRoutes = useMemo(() => {
+    if (activeRoutes && Array.isArray(activeRoutes)) {
+      return activeRoutes;
+    }
+    return routes || [];
+  }, [activeRoutes, routes]);
+
   useEffect(() => {
     const routesLayer = routesLayerRef.current;
     if (!routesLayer) return;
 
     routesLayer.clearLayers();
 
-    routes.forEach((route) => {
-      if (!route.polylineGeometry) return;
+    let combinedBounds = null;
+
+    displayRoutes.forEach((route) => {
+      if (!route?.polylineGeometry) return;
 
       try {
         const geojson = typeof route.polylineGeometry === 'string'
           ? JSON.parse(route.polylineGeometry)
           : route.polylineGeometry;
 
+        const lineColor = route.color || '#2563eb';
+
         const line = L.geoJSON(geojson, {
           style: {
-            color: route.color || '#2563eb',
+            color: lineColor,
             weight: 4,
             opacity: 0.85,
             lineCap: 'round',
@@ -191,19 +267,83 @@ export function InteractiveMap({
           },
         });
 
+        const driverName = route.driver?.fullName || 'Unassigned';
+        const vehiclePlate = route.vehicle?.licensePlate ? `(${route.vehicle.licensePlate})` : '';
+
         line.bindPopup(`
-          <div style="font-family: inherit; font-size: 12px;">
-            <div style="font-weight: 700; color: #1e293b;">Active Route</div>
-            <div style="color: #475569; margin-top: 2px;">Distance: ${route.totalDistanceKm} km</div>
-            <div style="color: #475569;">Duration: ${route.totalDurationMin} min</div>
+          <div style="font-family: inherit; font-size: 12px; line-height: 1.4;">
+            <div style="font-weight: 700; color: #1e293b;">${route.vehicle?.brand || 'Active Route'} ${vehiclePlate}</div>
+            <div style="color: #475569; margin-top: 2px;">Driver: <strong>${driverName}</strong></div>
+            <div style="color: #475569;">Distance: ${route.totalDistanceKm} km | Duration: ${route.totalDurationMin} min</div>
             <div style="color: #475569;">Status: ${route.status}</div>
           </div>
         `);
 
         routesLayer.addLayer(line);
+
+        const bounds = line.getBounds();
+        if (bounds.isValid()) {
+          combinedBounds = combinedBounds ? combinedBounds.extend(bounds) : bounds;
+        }
       } catch {}
     });
-  }, [routes]);
+
+    if (!hasFittedRouteRef.current && combinedBounds && combinedBounds.isValid() && mapInstanceRef.current) {
+      mapInstanceRef.current.fitBounds(combinedBounds, { padding: [40, 40] });
+      hasFittedRouteRef.current = true;
+    }
+  }, [displayRoutes]);
+
+  useEffect(() => {
+    const driversLayer = driversLayerRef.current;
+    if (!driversLayer) return;
+
+    driversLayer.clearLayers();
+
+    const driversToRender = [];
+
+    if (driverLocation?.latitude && driverLocation?.longitude) {
+      driversToRender.push({
+        id: 'local-driver',
+        label: 'My Vehicle (Live GPS)',
+        latitude: driverLocation.latitude,
+        longitude: driverLocation.longitude,
+        heading: driverLocation.heading || 0,
+        speed: driverLocation.speed,
+      });
+    }
+
+    socketDriverLocations.forEach((data) => {
+      if (driverLocation && data.driverId === driverLocation.driverId) return;
+      driversToRender.push({
+        id: data.driverId,
+        label: `Driver (${data.driverId.slice(0, 6)})`,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        heading: data.heading || 0,
+        speed: data.speed,
+      });
+    });
+
+    driversToRender.forEach((d) => {
+      const marker = L.marker([d.latitude, d.longitude], {
+        icon: createDriverIcon(d.heading),
+        zIndexOffset: 1000,
+        title: d.label,
+      });
+
+      marker.bindPopup(`
+        <div style="font-family: inherit; font-size: 12px; line-height: 1.4;">
+          <div style="font-weight: 700; color: #1e293b;">${d.label}</div>
+          <div style="color: #2563eb; font-weight: 600; margin-top: 2px;">Live GPS Tracking</div>
+          ${d.speed !== undefined ? `<div style="color: #64748b;">Speed: ${Math.round(d.speed)} km/h</div>` : ''}
+          <div style="color: #64748b; font-size: 11px;">Lat: ${d.latitude.toFixed(5)}, Lng: ${d.longitude.toFixed(5)}</div>
+        </div>
+      `);
+
+      driversLayer.addLayer(marker);
+    });
+  }, [driverLocation, socketDriverLocations]);
 
   useEffect(() => {
     const previewLayer = previewLayerRef.current;
@@ -265,6 +405,22 @@ export function InteractiveMap({
       }
     } catch {}
   }, [focusRoute]);
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !centerCoords || recenterTrigger === 0) return;
+    if (centerCoords.latitude && centerCoords.longitude) {
+      map.setView([centerCoords.latitude, centerCoords.longitude], 15, { animate: true });
+    } else if (Array.isArray(centerCoords) && centerCoords.length === 2) {
+      map.setView(centerCoords, 15, { animate: true });
+    }
+  }, [recenterTrigger]);
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !followDriver || !driverLocation?.latitude || !driverLocation?.longitude) return;
+    map.panTo([driverLocation.latitude, driverLocation.longitude], { animate: true, duration: 0.8 });
+  }, [driverLocation, followDriver]);
 
   return (
     <div

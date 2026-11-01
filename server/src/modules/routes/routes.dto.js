@@ -36,3 +36,7 @@ export const updatePointStatusSchema = z.object({
 export const queryRouteSchema = z.object({
   status: z.enum(['DRAFT', 'ACTIVE', 'COMPLETED']).optional(),
 });
+
+export const reassignRouteVehicleSchema = z.object({
+  vehicleId: z.string().uuid('Invalid vehicle ID format'),
+});

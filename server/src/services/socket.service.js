@@ -37,6 +37,13 @@ class SocketService {
 
       socket.join(`driver_${socket.user.id}`);
 
+      socket.on('driver:location_update', (data) => {
+        this.emitToDispatchers('driver:location_changed', {
+          driverId: socket.user.id,
+          ...data,
+        });
+      });
+
       socket.on('disconnect', () => {});
     });
   }

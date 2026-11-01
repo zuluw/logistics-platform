@@ -46,6 +46,14 @@ export class AuthService {
         phone: true,
         createdAt: true,
         updatedAt: true,
+        vehiclesAssigned: {
+          select: {
+            id: true,
+            brand: true,
+            licensePlate: true,
+            status: true,
+          },
+        },
       },
     });
 
@@ -57,6 +65,16 @@ export class AuthService {
   async login({ email, password }) {
     const user = await prisma.user.findUnique({
       where: { email },
+      include: {
+        vehiclesAssigned: {
+          select: {
+            id: true,
+            brand: true,
+            licensePlate: true,
+            status: true,
+          },
+        },
+      },
     });
 
     if (!user) {
@@ -86,6 +104,14 @@ export class AuthService {
         phone: true,
         createdAt: true,
         updatedAt: true,
+        vehiclesAssigned: {
+          select: {
+            id: true,
+            brand: true,
+            licensePlate: true,
+            status: true,
+          },
+        },
       },
     });
 
@@ -116,6 +142,14 @@ export class AuthService {
         phone: true,
         createdAt: true,
         updatedAt: true,
+        vehiclesAssigned: {
+          select: {
+            id: true,
+            brand: true,
+            licensePlate: true,
+            status: true,
+          },
+        },
       },
     });
 

@@ -51,6 +51,15 @@ export class RoutesController {
       next(error);
     }
   }
+
+  async reassignRouteVehicle(req, res, next) {
+    try {
+      const route = await routesService.reassignRouteVehicle(req.params.id, req.body.vehicleId);
+      return ApiResponse.ok(res, route, 'Route vehicle reassigned successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const routesController = new RoutesController();
