@@ -64,6 +64,7 @@ export function InteractiveMap({
   selectedOrderIds = [],
   onMapClick,
   className = '',
+  focusRoute = null,
 }) {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -154,7 +155,7 @@ export function InteractiveMap({
           <div style="font-weight: 700; font-size: 13px; color: #0f172a;">${order.customerName}</div>
           <div style="color: #334155; margin-top: 3px;"><strong>Address:</strong> ${order.deliveryAddress}</div>
           <div style="color: #334155; margin-top: 2px;"><strong>Phone:</strong> ${order.customerPhone}</div>
-          <div style="color: #334155; margin-top: 2px;"><strong>Weight:</strong> ${order.weightKg} kg | <strong>Vol:</strong> ${order.volumeM3} m³</div>
+          <div style="color: #334155; margin-top: 2px;"><strong>Weight:</strong> ${order.weightKg} kg | <strong>Vol:</strong> ${order.volumeM3} m3</div>
           <div style="margin-top: 6px; display: inline-block; padding: 2px 8px; border-radius: 9999px; font-weight: 600; font-size: 10px; background-color: ${getStatusColor(order.status)}18; color: ${getStatusColor(order.status)};">
             ${order.status}
           </div>
@@ -182,7 +183,7 @@ export function InteractiveMap({
 
         const line = L.geoJSON(geojson, {
           style: {
-            color: '#2563eb',
+            color: route.color || '#2563eb',
             weight: 4,
             opacity: 0.85,
             lineCap: 'round',
@@ -247,6 +248,23 @@ export function InteractiveMap({
       } catch {}
     }
   }, [previewRoute]);
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !focusRoute?.polylineGeometry) return;
+
+    try {
+      const geojson = typeof focusRoute.polylineGeometry === 'string'
+        ? JSON.parse(focusRoute.polylineGeometry)
+        : focusRoute.polylineGeometry;
+
+      const line = L.geoJSON(geojson);
+      const bounds = line.getBounds();
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+      }
+    } catch {}
+  }, [focusRoute]);
 
   return (
     <div

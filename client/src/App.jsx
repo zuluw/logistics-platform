@@ -6,9 +6,10 @@ import { LandingPage } from './modules/landing/LandingPage.jsx';
 import { AuthPage } from './modules/auth/AuthPage.jsx';
 import { DispatcherDashboard } from './modules/dispatcher/DispatcherDashboard.jsx';
 import { DriverDashboard } from './modules/driver/DriverDashboard.jsx';
+import { AdminDashboard } from './modules/admin/AdminDashboard.jsx';
 
 function MainApp() {
-  const { isAuthenticated, isLoading, isDispatcher, isDriver } = useAuth();
+  const { isAuthenticated, isLoading, isDispatcher, isDriver, isAdmin } = useAuth();
   const [authMode, setAuthMode] = useState(null);
 
   if (isLoading) {
@@ -36,6 +37,10 @@ function MainApp() {
         onOpenAuth={(mode) => setAuthMode(mode || 'signin')}
       />
     );
+  }
+
+  if (isAdmin) {
+    return <AdminDashboard />;
   }
 
   if (isDriver) {
