@@ -4,7 +4,7 @@ import { useSocket } from '../../context/SocketContext.jsx';
 import { useLogistics } from '../../context/LogisticsContext.jsx';
 import { DriverPointCard } from './DriverPointCard.jsx';
 import { InteractiveMap } from '../../components/Map/InteractiveMap.jsx';
-import { Button } from '../../components/index.js';
+import { Button, ProfileModal } from '../../components/index.js';
 import { Truck, LogOut, RefreshCw, Wifi, WifiOff, Map, MapPin, Clock, Route as RouteIcon } from 'lucide-react';
 
 export function DriverDashboard() {
@@ -15,6 +15,7 @@ export function DriverDashboard() {
   const [showMap, setShowMap] = useState(false);
   const [updatingPointId, setUpdatingPointId] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   useEffect(() => {
     fetchMyActiveRoute();
@@ -99,6 +100,18 @@ export function DriverDashboard() {
             >
               <RefreshCw className="h-4 w-4 text-slate-500" />
             </Button>
+
+            <button
+              type="button"
+              onClick={() => setIsProfileModalOpen(true)}
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-medium text-slate-700 transition-colors cursor-pointer shadow-2xs"
+              title="My Profile"
+            >
+              <div className="w-5 h-5 rounded-full bg-zinc-900 text-white flex items-center justify-center font-bold text-[10px]">
+                {user?.fullName ? user.fullName.split(' ').filter(Boolean).map((n) => n[0]).join('').toUpperCase().slice(0, 2) : 'U'}
+              </div>
+              <span className="hidden sm:inline font-medium text-slate-700">{user?.fullName}</span>
+            </button>
 
             <Button variant="ghost" size="sm" onClick={logout} title="Sign Out">
               <LogOut className="h-4 w-4 text-slate-500" />
@@ -242,6 +255,11 @@ export function DriverDashboard() {
           </div>
         )}
       </main>
+
+      <ProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+      />
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useSocket } from '../../context/SocketContext.jsx';
 import { useLogistics } from '../../context/LogisticsContext.jsx';
-import { Button } from '../../components/index.js';
+import { Button, ProfileModal } from '../../components/index.js';
 import { InteractiveMap } from '../../components/Map/InteractiveMap.jsx';
 import { OrdersListPanel } from './OrdersListPanel.jsx';
 import { VehiclesListPanel } from './VehiclesListPanel.jsx';
@@ -33,6 +33,7 @@ export function DispatcherDashboard() {
   const [routeError, setRouteError] = useState(null);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [mapClickedCoords, setMapClickedCoords] = useState(null);
 
   const selectedVehicle = useMemo(() => {
@@ -177,6 +178,18 @@ export function DispatcherDashboard() {
           >
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
+
+          <button
+            type="button"
+            onClick={() => setIsProfileModalOpen(true)}
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-medium text-slate-700 transition-colors cursor-pointer shadow-2xs"
+            title="My Profile"
+          >
+            <div className="w-5 h-5 rounded-full bg-zinc-900 text-white flex items-center justify-center font-bold text-[10px]">
+              {user?.fullName ? user.fullName.split(' ').filter(Boolean).map((n) => n[0]).join('').toUpperCase().slice(0, 2) : 'U'}
+            </div>
+            <span className="hidden sm:inline font-medium text-slate-700">{user?.fullName}</span>
+          </button>
 
           <Button variant="ghost" size="sm" onClick={logout} title="Sign Out">
             <LogOut className="h-4 w-4 text-slate-500" />
@@ -337,6 +350,11 @@ export function DispatcherDashboard() {
         }}
         onSubmit={handleCreateOrderSubmit}
         initialCoords={mapClickedCoords}
+      />
+
+      <ProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
       />
     </div>
   );
