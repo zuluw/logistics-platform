@@ -323,7 +323,7 @@ export function DispatcherDashboard({ onBackToAdmin } = {}) {
             onMapClick={handleMapClick}
           />
 
-          <div className="absolute top-4 right-4 z-10 bg-white/95 backdrop-blur-xs rounded-xl shadow-md border border-slate-200/80 p-3 text-xs space-y-2 pointer-events-auto">
+          <div className="absolute bottom-5 right-5 z-10 bg-white/95 backdrop-blur-xs rounded-xl shadow-md border border-slate-200/80 p-3 text-xs space-y-2 pointer-events-auto">
             <div className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">
               Map Legend
             </div>

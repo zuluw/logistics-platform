@@ -264,7 +264,7 @@ export function VehiclesListPanel({
                     Max Payload: <strong className="text-zinc-900">{vehicle.capacityKg} kg</strong>
                   </div>
                   <div>
-                    Cargo Volume: <strong className="text-zinc-900">{vehicle.volumeM3} m³</strong>
+                    Cargo Volume: <strong className="text-zinc-900">{vehicle.volumeM3} m<sup>3</sup></strong>
                   </div>
                 </div>
               </div>

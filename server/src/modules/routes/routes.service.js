@@ -14,6 +14,22 @@ const ROUTE_INCLUDE = {
   },
 };
 
+function attachSteps(route) {
+  if (!route) return route;
+  let steps = [];
+  if (route.polylineGeometry) {
+    try {
+      const parsed = typeof route.polylineGeometry === 'string'
+        ? JSON.parse(route.polylineGeometry)
+        : route.polylineGeometry;
+      if (Array.isArray(parsed?.steps)) {
+        steps = parsed.steps;
+      }
+    } catch {}
+  }
+  return { ...route, steps };
+}
+
 async function resolveAndValidate(vehicleId, orderIds) {
   const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
 
@@ -71,6 +87,7 @@ export class RoutesService {
       distanceKm: osrmResult.distanceKm,
       durationMin: osrmResult.durationMin,
       geometry: osrmResult.geometry,
+      steps: osrmResult.steps || [],
       orderedOrders,
     };
   }
@@ -87,13 +104,22 @@ export class RoutesService {
     const osrmResult = await osrmService.optimizeTrip(coordinates);
     const orderedOrders = applyWaypointOrder(orders, osrmResult.waypointsOrder);
 
+    const geomObj = typeof osrmResult.geometry === 'string'
+      ? JSON.parse(osrmResult.geometry)
+      : osrmResult.geometry;
+
+    const polylineGeometry = JSON.stringify({
+      ...geomObj,
+      steps: osrmResult.steps || [],
+    });
+
     const route = await prisma.$transaction(async (tx) => {
       const created = await tx.route.create({
         data: {
           status: 'ACTIVE',
           totalDistanceKm: osrmResult.distanceKm,
           totalDurationMin: osrmResult.durationMin,
-          polylineGeometry: osrmResult.geometry,
+          polylineGeometry,
           vehicleId,
           driverId,
           dispatcherId,
@@ -127,10 +153,12 @@ export class RoutesService {
       include: ROUTE_INCLUDE,
     });
 
-    socketService.emitToDriver(driverId, 'route:assigned', createdRoute);
-    socketService.emitToDispatchers('route:created', createdRoute);
+    const enrichedRoute = attachSteps(createdRoute);
 
-    return createdRoute;
+    socketService.emitToDriver(driverId, 'route:assigned', enrichedRoute);
+    socketService.emitToDispatchers('route:created', enrichedRoute);
+
+    return enrichedRoute;
   }
 
   async getMyActiveRoute(driverId) {
@@ -143,17 +171,19 @@ export class RoutesService {
       throw ApiError.notFound('No active route found for this driver');
     }
 
-    return route;
+    return attachSteps(route);
   }
 
   async getRoutes({ status } = {}) {
     const where = status ? { status } : {};
 
-    return prisma.route.findMany({
+    const routes = await prisma.route.findMany({
       where,
       include: ROUTE_INCLUDE,
       orderBy: { createdAt: 'desc' },
     });
+
+    return routes.map(attachSteps);
   }
 
   async updatePointStatus(driverId, routeId, pointId, status) {
@@ -244,10 +274,12 @@ export class RoutesService {
         .catch(() => {});
     }
 
-    return prisma.route.findUnique({
+    const updated = await prisma.route.findUnique({
       where: { id: routeId },
       include: ROUTE_INCLUDE,
     });
+
+    return attachSteps(updated);
   }
 
   async reassignRouteVehicle(routeId, newVehicleId) {
@@ -260,10 +292,11 @@ export class RoutesService {
     }
 
     if (route.vehicleId === newVehicleId) {
-      return prisma.route.findUnique({
+      const existing = await prisma.route.findUnique({
         where: { id: routeId },
         include: ROUTE_INCLUDE,
       });
+      return attachSteps(existing);
     }
 
     const newVehicle = await prisma.vehicle.findUnique({
@@ -302,10 +335,12 @@ export class RoutesService {
       include: ROUTE_INCLUDE,
     });
 
-    socketService.emitToDriver(updatedRoute.driverId, 'route:vehicle_updated', updatedRoute);
-    socketService.emitToDispatchers('route:updated', updatedRoute);
+    const enrichedRoute = attachSteps(updatedRoute);
 
-    return updatedRoute;
+    socketService.emitToDriver(enrichedRoute.driverId, 'route:vehicle_updated', enrichedRoute);
+    socketService.emitToDispatchers('route:updated', enrichedRoute);
+
+    return enrichedRoute;
   }
 }
 
