@@ -10,7 +10,7 @@ import { RouteControlPanel } from './RouteControlPanel.jsx';
 import { CreateOrderModal } from './CreateOrderModal.jsx';
 import { Truck, LogOut, RefreshCw, Wifi, WifiOff, Package, Route as RouteIcon } from 'lucide-react';
 
-export function DispatcherDashboard() {
+export function DispatcherDashboard({ onBackToAdmin } = {}) {
   const { user, logout } = useAuth();
   const { isConnected } = useSocket();
   const {
@@ -151,13 +151,23 @@ export function DispatcherDashboard() {
             </h1>
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <span>{user?.fullName}</span>
-              <span>•</span>
+              <span>/</span>
               <span className="font-semibold text-indigo-600">{user?.role}</span>
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
+          {onBackToAdmin && (
+            <button
+              type="button"
+              onClick={onBackToAdmin}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 text-xs font-semibold text-zinc-800 transition-colors cursor-pointer shadow-2xs"
+              title="Return to Admin Control Center"
+            >
+              <span>&larr; Back to Admin</span>
+            </button>
+          )}
           <div
             className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
               isConnected
