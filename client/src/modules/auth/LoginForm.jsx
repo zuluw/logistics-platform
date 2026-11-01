@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { Eye, EyeOff } from 'lucide-react';
+import { apiClient } from '../../api/client.js';
 
 export function LoginForm({ onForgotModeChange }) {
   const { login } = useAuth();
@@ -14,10 +15,12 @@ export function LoginForm({ onForgotModeChange }) {
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
+  const [forgotError, setForgotError] = useState(null);
 
   const handleToggleForgot = (mode) => {
     setIsForgot(mode);
     setError(null);
+    setForgotError(null);
     setForgotSent(false);
     if (onForgotModeChange) {
       onForgotModeChange(mode);
@@ -38,14 +41,20 @@ export function LoginForm({ onForgotModeChange }) {
     }
   };
 
-  const handleForgotSubmit = (e) => {
+  const handleForgotSubmit = async (e) => {
     e.preventDefault();
     if (!forgotEmail) return;
+    setForgotError(null);
     setForgotLoading(true);
-    setTimeout(() => {
-      setForgotLoading(false);
+
+    try {
+      await apiClient.post('/auth/forgot-password', { email: forgotEmail.trim() });
       setForgotSent(true);
-    }, 600);
+    } catch (err) {
+      setForgotError(err.message || 'Failed to send recovery link');
+    } finally {
+      setForgotLoading(false);
+    }
   };
 
   if (isForgot) {
@@ -61,7 +70,7 @@ export function LoginForm({ onForgotModeChange }) {
         {forgotSent ? (
           <div className="space-y-4">
             <div className="rounded-lg bg-zinc-100 border border-zinc-200 p-3 text-xs text-zinc-700 leading-relaxed">
-              Recovery link has been dispatched to <span className="font-semibold text-zinc-900">{forgotEmail}</span>
+              Password reset link sent! Check your inbox.
             </div>
             <button
               type="button"
@@ -73,6 +82,11 @@ export function LoginForm({ onForgotModeChange }) {
           </div>
         ) : (
           <form onSubmit={handleForgotSubmit} className="space-y-3.5">
+            {forgotError && (
+              <div className="rounded-lg bg-rose-50 border border-rose-200 p-2.5 text-xs text-rose-700">
+                {forgotError}
+              </div>
+            )}
             <div className="space-y-1">
               <label className="block text-xs font-medium text-zinc-700">
                 Email

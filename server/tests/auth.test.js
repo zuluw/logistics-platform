@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import app from '../src/app.js';
 import { prisma } from '../src/config/prisma.js';
 import { env } from '../src/config/env.js';
+import { mailService } from '../src/services/mail.service.js';
 
 describe('Auth Module API', () => {
   const token = jwt.sign(
@@ -162,5 +163,73 @@ describe('Auth Module API', () => {
     expect(res.body.data.totalRoutesCount).toBe(10);
     expect(res.body.data.totalOrdersDistributed).toBe(45);
     expect(res.body.data.totalDistanceKm).toBe(340.5);
+  });
+
+  it('POST /api/auth/forgot-password sends recovery email for existing user', async () => {
+    vi.spyOn(prisma.user, 'findUnique').mockResolvedValue({
+      id: 'mock-user-id',
+      email: 'dispatcher@logistics.by',
+    });
+    const sendMailSpy = vi.spyOn(mailService, 'sendPasswordResetEmail').mockResolvedValue({});
+
+    const res = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'dispatcher@logistics.by' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(sendMailSpy).toHaveBeenCalledWith('dispatcher@logistics.by', expect.any(String));
+  });
+
+  it('POST /api/auth/forgot-password returns 404 for non-existent user', async () => {
+    vi.spyOn(prisma.user, 'findUnique').mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'unknown@logistics.by' });
+
+    expect(res.status).toBe(404);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('POST /api/auth/reset-password resets password with valid token', async () => {
+    const resetToken = jwt.sign(
+      { id: 'mock-user-id', email: 'dispatcher@logistics.by', type: 'password_reset' },
+      env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    vi.spyOn(prisma.user, 'findUnique').mockResolvedValue({
+      id: 'mock-user-id',
+      email: 'dispatcher@logistics.by',
+    });
+    const updateSpy = vi.spyOn(prisma.user, 'update').mockResolvedValue({});
+
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send({
+        token: resetToken,
+        newPassword: 'brandNewPassword123',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(updateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'mock-user-id' },
+      })
+    );
+  });
+
+  it('POST /api/auth/reset-password returns 400 for invalid token', async () => {
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send({
+        token: 'invalid-token',
+        newPassword: 'brandNewPassword123',
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
   });
 });

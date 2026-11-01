@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../../config/prisma.js';
 import { env } from '../../config/env.js';
 import { ApiError } from '../../common/errors/apiError.js';
+import { mailService } from '../../services/mail.service.js';
 
 const generateToken = (user) => {
   return jwt.sign(
@@ -179,6 +180,62 @@ export class AuthService {
     });
 
     return { message: 'Password updated successfully' };
+  }
+
+  async requestPasswordReset(email) {
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      throw ApiError.notFound('User with this email not found');
+    }
+
+    const resetToken = jwt.sign(
+      {
+        id: user.id,
+        email: user.email,
+        type: 'password_reset',
+      },
+      env.JWT_SECRET,
+      {
+        expiresIn: '1h',
+      }
+    );
+
+    await mailService.sendPasswordResetEmail(user.email, resetToken);
+
+    return { message: 'Password reset email sent successfully' };
+  }
+
+  async resetPassword(token, newPassword) {
+    let payload;
+    try {
+      payload = jwt.verify(token, env.JWT_SECRET);
+    } catch {
+      throw ApiError.badRequest('Invalid or expired reset token');
+    }
+
+    if (!payload?.id) {
+      throw ApiError.badRequest('Invalid reset token');
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: payload.id },
+    });
+
+    if (!user) {
+      throw ApiError.notFound('User not found');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash },
+    });
+
+    return { message: 'Password has been reset successfully' };
   }
 
   async getUserStats(userId, role) {

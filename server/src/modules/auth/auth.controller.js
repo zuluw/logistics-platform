@@ -55,6 +55,25 @@ export class AuthController {
       next(error);
     }
   }
+
+  async forgotPassword(req, res, next) {
+    try {
+      const result = await authService.requestPasswordReset(req.body.email);
+      return ApiResponse.ok(res, result, 'Password reset email sent successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async resetPassword(req, res, next) {
+    try {
+      const { token, newPassword } = req.body;
+      const result = await authService.resetPassword(token, newPassword);
+      return ApiResponse.ok(res, result, 'Password reset successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const authController = new AuthController();

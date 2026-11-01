@@ -8,9 +8,21 @@ import { DispatcherDashboard } from './modules/dispatcher/DispatcherDashboard.js
 import { DriverDashboard } from './modules/driver/DriverDashboard.jsx';
 import { AdminDashboard } from './modules/admin/AdminDashboard.jsx';
 
+function getResetTokenFromUrl() {
+  if (typeof window === 'undefined') return null;
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('token');
+  const isResetPath = window.location.pathname.includes('/reset-password');
+  if (token || isResetPath) {
+    return token || '';
+  }
+  return null;
+}
+
 function MainApp() {
   const { isAuthenticated, isLoading, isDispatcher, isDriver, isAdmin } = useAuth();
   const [authMode, setAuthMode] = useState(null);
+  const [resetToken, setResetToken] = useState(getResetTokenFromUrl);
 
   if (isLoading) {
     return (
@@ -20,6 +32,29 @@ function MainApp() {
           <p className="text-xs font-medium text-zinc-500">Loading Logistics Platform...</p>
         </div>
       </div>
+    );
+  }
+
+  if (resetToken !== null) {
+    return (
+      <AuthPage
+        initialTab="reset"
+        resetToken={resetToken}
+        onResetComplete={() => {
+          setResetToken(null);
+          setAuthMode('signin');
+          if (typeof window !== 'undefined' && window.history.replaceState) {
+            window.history.replaceState({}, '', '/');
+          }
+        }}
+        onBack={() => {
+          setResetToken(null);
+          setAuthMode(null);
+          if (typeof window !== 'undefined' && window.history.replaceState) {
+            window.history.replaceState({}, '', '/');
+          }
+        }}
+      />
     );
   }
 
