@@ -2,6 +2,7 @@ import { prisma } from '../../config/prisma.js';
 import { ApiError } from '../../common/errors/apiError.js';
 import { osrmService } from '../../services/osrm.service.js';
 import { socketService } from '../../services/socket.service.js';
+import { mailService } from '../../services/mail.service.js';
 
 const ROUTE_INCLUDE = {
   vehicle: true,
@@ -159,6 +160,7 @@ export class RoutesService {
     const route = await prisma.route.findUnique({
       where: { id: routeId },
       include: {
+        driver: { select: { id: true, fullName: true, phone: true } },
         routePoints: {
           include: { order: true },
         },
@@ -226,6 +228,21 @@ export class RoutesService {
       actualArrival,
       isCompleted,
     });
+
+    if (status === 'DELIVERED') {
+      const recipientEmail = point.order.customerPhone
+        ? `${point.order.customerName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'customer'}@delivery.client`
+        : 'customer@delivery.client';
+
+      mailService
+        .sendDeliveryConfirmationEmail(recipientEmail, {
+          customerName: point.order.customerName,
+          deliveryAddress: point.order.deliveryAddress,
+          actualArrival: new Date(),
+          courierName: route.driver?.fullName || 'Courier Driver',
+        })
+        .catch(() => {});
+    }
 
     return prisma.route.findUnique({
       where: { id: routeId },

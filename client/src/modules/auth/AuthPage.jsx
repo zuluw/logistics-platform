@@ -2,16 +2,57 @@ import { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { LoginForm } from './LoginForm.jsx';
 import { RegisterForm } from './RegisterForm.jsx';
+import { ResetPasswordForm } from './ResetPasswordForm.jsx';
 import { Route, ArrowLeft } from 'lucide-react';
 
-export function AuthPage({ initialTab = 'signin', onBack }) {
-  const [activeTab, setActiveTab] = useState(initialTab);
+export function AuthPage({ initialTab = 'signin', resetToken = null, onBack, onResetComplete }) {
+  const [tokenState, setTokenState] = useState(() => {
+    if (resetToken) return resetToken;
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('token') || '';
+    }
+    return '';
+  });
+
+  const [activeTab, setActiveTab] = useState(() => {
+    if (initialTab === 'reset') return 'reset';
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('token') || window.location.pathname.includes('/reset-password')) {
+        return 'reset';
+      }
+    }
+    return initialTab;
+  });
+
   const [isForgotMode, setIsForgotMode] = useState(false);
   const mapContainerRef = useRef(null);
 
   useEffect(() => {
-    setActiveTab(initialTab);
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
   }, [initialTab]);
+
+  useEffect(() => {
+    if (resetToken !== null && resetToken !== undefined) {
+      setTokenState(resetToken);
+    }
+  }, [resetToken]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlToken = params.get('token');
+      if (urlToken || window.location.pathname.includes('/reset-password')) {
+        setActiveTab('reset');
+        if (urlToken) {
+          setTokenState(urlToken);
+        }
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -144,6 +185,16 @@ export function AuthPage({ initialTab = 'signin', onBack }) {
     setIsForgotMode(false);
   };
 
+  const handleBackToLogin = () => {
+    if (typeof window !== 'undefined' && window.history.replaceState) {
+      window.history.replaceState({}, '', '/');
+    }
+    setActiveTab('signin');
+    if (onResetComplete) {
+      onResetComplete();
+    }
+  };
+
   return (
     <div className="h-screen w-screen flex items-center justify-center bg-zinc-50 relative overflow-hidden select-none">
       <div className="absolute inset-0 overflow-hidden pointer-events-none select-none z-0">
@@ -173,7 +224,7 @@ export function AuthPage({ initialTab = 'signin', onBack }) {
           </span>
         </div>
 
-        {!isForgotMode && (
+        {!isForgotMode && activeTab !== 'reset' && (
           <div className="flex bg-zinc-100 p-1 rounded-lg text-xs font-medium mb-6">
             <button
               type="button"
@@ -200,7 +251,9 @@ export function AuthPage({ initialTab = 'signin', onBack }) {
           </div>
         )}
 
-        {activeTab === 'signin' ? (
+        {activeTab === 'reset' ? (
+          <ResetPasswordForm token={tokenState} onBackToLogin={handleBackToLogin} />
+        ) : activeTab === 'signin' ? (
           <LoginForm onForgotModeChange={setIsForgotMode} />
         ) : (
           <RegisterForm />
