@@ -139,7 +139,7 @@ export function RouteControlPanel({
             <div className="text-xs space-y-1">
               <div className="text-sm font-bold text-slate-900">{selectedVehicle.brand}</div>
               <div className="text-slate-600">
-                Max Payload: <strong>{selectedVehicle.capacityKg} kg</strong> | Volume: <strong>{selectedVehicle.volumeM3} m³</strong>
+                Max Payload: <strong>{selectedVehicle.capacityKg} kg</strong> | Volume: <strong>{selectedVehicle.volumeM3} m<sup>3</sup></strong>
               </div>
             </div>
           ) : (

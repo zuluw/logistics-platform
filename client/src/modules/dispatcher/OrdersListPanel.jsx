@@ -201,7 +201,7 @@ export function OrdersListPanel({
                     </span>
                     <span>•</span>
                     <span>
-                      Vol: <strong className="text-slate-700">{order.volumeM3} m³</strong>
+                      Vol: <strong className="text-slate-700">{order.volumeM3} m<sup>3</sup></strong>
                     </span>
                   </div>
                   <div className="text-slate-400 font-mono text-[10px]">

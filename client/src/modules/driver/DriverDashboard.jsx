@@ -56,6 +56,10 @@ export function DriverDashboard() {
   const watchIdRef = useRef(null);
   const simulationIntervalRef = useRef(null);
   const simulationIndexRef = useRef(0);
+  const currentGpsRef = useRef(currentGps);
+  useEffect(() => {
+    currentGpsRef.current = currentGps;
+  }, [currentGps]);
 
   useEffect(() => {
     fetchMyActiveRoute();
@@ -134,6 +138,97 @@ export function DriverDashboard() {
     }
     return [];
   }, [activeRoute?.polylineGeometry, sortedPoints]);
+
+
+  const routeSteps = useMemo(() => {
+    if (Array.isArray(activeRoute?.steps) && activeRoute.steps.length > 0) {
+      return activeRoute.steps;
+    }
+    if (activeRoute?.polylineGeometry) {
+      try {
+        const parsed =
+          typeof activeRoute.polylineGeometry === 'string'
+            ? JSON.parse(activeRoute.polylineGeometry)
+            : activeRoute.polylineGeometry;
+        if (Array.isArray(parsed?.steps) && parsed.steps.length > 0) {
+          return parsed.steps;
+        }
+      } catch {}
+    }
+    return [];
+  }, [activeRoute]);
+
+  const stepPolylineIndices = useMemo(() => {
+    if (!routeSteps.length || !simulationCoords.length) return [];
+    return routeSteps.map((step) => {
+      if (!step.location || step.location.length < 2) return 0;
+      let closestIdx = 0;
+      let minD = Infinity;
+      for (let i = 0; i < simulationCoords.length; i++) {
+        const pt = simulationCoords[i];
+        const d = (pt[0] - step.location[0]) ** 2 + (pt[1] - step.location[1]) ** 2;
+        if (d < minD) {
+          minD = d;
+          closestIdx = i;
+        }
+      }
+      return closestIdx;
+    });
+  }, [routeSteps, simulationCoords]);
+
+  const { activeStepIndex, currentStepDistance } = useMemo(() => {
+    if (!routeSteps.length || !currentGps?.latitude || !currentGps?.longitude) {
+      return { activeStepIndex: -1, currentStepDistance: null };
+    }
+
+    let currentIdx = 0;
+    if (simulationCoords.length > 0) {
+      let minD = Infinity;
+      for (let i = 0; i < simulationCoords.length; i++) {
+        const pt = simulationCoords[i];
+        const d = (pt[1] - currentGps.latitude) ** 2 + (pt[0] - currentGps.longitude) ** 2;
+        if (d < minD) {
+          minD = d;
+          currentIdx = i;
+        }
+      }
+    }
+
+    let activeIdx = 0;
+    if (stepPolylineIndices.length > 1) {
+      if (currentIdx === 0) {
+        activeIdx = 0;
+      } else {
+        for (let i = 1; i < routeSteps.length; i++) {
+          if (currentIdx <= stepPolylineIndices[i]) {
+            activeIdx = i;
+            break;
+          }
+          activeIdx = i;
+        }
+      }
+    }
+
+    const targetStep = routeSteps[activeIdx];
+    let dist = null;
+    if (targetStep?.location && targetStep.location.length >= 2) {
+      const R = 6371000;
+      const dLat = ((targetStep.location[1] - currentGps.latitude) * Math.PI) / 180;
+      const dLon = ((targetStep.location[0] - currentGps.longitude) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos((currentGps.latitude * Math.PI) / 180) *
+          Math.cos((targetStep.location[1] * Math.PI) / 180) *
+          Math.sin(dLon / 2) ** 2;
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      dist = Math.round(R * c);
+    }
+
+    return {
+      activeStepIndex: activeIdx,
+      currentStepDistance: dist,
+    };
+  }, [routeSteps, currentGps, simulationCoords, stepPolylineIndices]);
 
   const stopGps = useCallback(() => {
     if (watchIdRef.current !== null && 'geolocation' in navigator) {
@@ -239,7 +334,22 @@ export function DriverDashboard() {
 
     setIsSimulating(true);
 
-    if (simulationIndexRef.current >= simulationCoords.length) {
+    const activeGps = currentGpsRef.current;
+    const targetLat = activeGps?.latitude || currentStop?.order?.latitude;
+    const targetLng = activeGps?.longitude || currentStop?.order?.longitude;
+    if (targetLat && targetLng) {
+      let nearestIdx = 0;
+      let minD = Infinity;
+      for (let i = 0; i < simulationCoords.length; i++) {
+        const pt = simulationCoords[i];
+        const d = (pt[1] - targetLat) ** 2 + (pt[0] - targetLng) ** 2;
+        if (d < minD) {
+          minD = d;
+          nearestIdx = i;
+        }
+      }
+      simulationIndexRef.current = nearestIdx;
+    } else if (simulationIndexRef.current >= simulationCoords.length) {
       simulationIndexRef.current = 0;
     }
 
@@ -596,7 +706,7 @@ export function DriverDashboard() {
                     Weight: {currentStop.order?.weightKg} kg
                   </span>
                   <span className="text-xs bg-white border border-zinc-200 px-2 py-0.5 rounded-md text-zinc-600 font-medium">
-                    Volume: {currentStop.order?.volumeM3} m³
+                    Volume: {currentStop.order?.volumeM3} m<sup>3</sup>
                   </span>
                 </div>
 
@@ -710,10 +820,13 @@ export function DriverDashboard() {
               centerCoords={recenterCoords}
               recenterTrigger={recenterTrigger}
               followDriver={isSimulating}
+              steps={routeSteps}
+              activeStepIndex={activeStepIndex}
+              currentDistanceMeters={currentStepDistance}
               className="w-full h-full"
             />
 
-            <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+            <div className="absolute top-4 left-14 z-20 flex items-center gap-2">
               <button
                 type="button"
                 onClick={toggleSimulation}

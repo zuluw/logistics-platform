@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import L from 'leaflet';
 import { useSocket } from '../../context/SocketContext.jsx';
+import { TurnByTurnPanel } from './TurnByTurnPanel.jsx';
 
 const MINSK_CENTER = [53.8961, 27.5503];
 
@@ -90,6 +91,9 @@ export function InteractiveMap({
   centerCoords = null,
   recenterTrigger = 0,
   followDriver = false,
+  steps = null,
+  activeStepIndex = null,
+  currentDistanceMeters = null,
 }) {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -98,6 +102,131 @@ export function InteractiveMap({
   const previewLayerRef = useRef(null);
   const driversLayerRef = useRef(null);
   const hasFittedRouteRef = useRef(false);
+
+  const activeSteps = useMemo(() => {
+    if (Array.isArray(steps) && steps.length > 0) return steps;
+    if (Array.isArray(previewRoute?.steps) && previewRoute.steps.length > 0) return previewRoute.steps;
+    if (Array.isArray(focusRoute?.steps) && focusRoute.steps.length > 0) return focusRoute.steps;
+    if (focusRoute?.polylineGeometry) {
+      try {
+        const parsed = typeof focusRoute.polylineGeometry === 'string'
+          ? JSON.parse(focusRoute.polylineGeometry)
+          : focusRoute.polylineGeometry;
+        if (Array.isArray(parsed?.steps) && parsed.steps.length > 0) return parsed.steps;
+      } catch {}
+    }
+    const primaryRoute = (activeRoutes && activeRoutes[0]) || (routes && routes[0]);
+    if (Array.isArray(primaryRoute?.steps) && primaryRoute.steps.length > 0) return primaryRoute.steps;
+    if (primaryRoute?.polylineGeometry) {
+      try {
+        const parsed = typeof primaryRoute.polylineGeometry === 'string'
+          ? JSON.parse(primaryRoute.polylineGeometry)
+          : primaryRoute.polylineGeometry;
+        if (Array.isArray(parsed?.steps) && parsed.steps.length > 0) return parsed.steps;
+      } catch {}
+    }
+    return [];
+  }, [steps, previewRoute, focusRoute, activeRoutes, routes]);
+
+  const handleStepClick = (location) => {
+    if (!mapInstanceRef.current || !location || location.length < 2) return;
+    const lng = location[0];
+    const lat = location[1];
+    mapInstanceRef.current.panTo([lat, lng], { animate: true });
+  };
+
+
+  const polylineCoords = useMemo(() => {
+    const route = focusRoute || (activeRoutes && activeRoutes[0]) || (routes && routes[0]) || previewRoute;
+    if (!route) return [];
+    const geom = route.polylineGeometry || route.geometry;
+    if (!geom) return [];
+    try {
+      const parsed = typeof geom === 'string' ? JSON.parse(geom) : geom;
+      if (parsed?.type === 'LineString' && Array.isArray(parsed.coordinates)) {
+        return parsed.coordinates;
+      }
+      if (parsed?.coordinates) {
+        return parsed.coordinates;
+      }
+    } catch {}
+    return [];
+  }, [focusRoute, activeRoutes, routes, previewRoute]);
+
+  const stepPolylineIndices = useMemo(() => {
+    if (!activeSteps.length || !polylineCoords.length) return [];
+    return activeSteps.map((step) => {
+      if (!step.location || step.location.length < 2) return 0;
+      let closestIdx = 0;
+      let minD = Infinity;
+      for (let i = 0; i < polylineCoords.length; i++) {
+        const pt = polylineCoords[i];
+        const d = (pt[0] - step.location[0]) ** 2 + (pt[1] - step.location[1]) ** 2;
+        if (d < minD) {
+          minD = d;
+          closestIdx = i;
+        }
+      }
+      return closestIdx;
+    });
+  }, [activeSteps, polylineCoords]);
+
+  const computedNav = useMemo(() => {
+    if (!activeSteps.length || !driverLocation?.latitude || !driverLocation?.longitude) {
+      return { stepIndex: -1, distanceMeters: null };
+    }
+
+    let currentPolylineIdx = 0;
+    if (polylineCoords.length > 0) {
+      let minD = Infinity;
+      for (let i = 0; i < polylineCoords.length; i++) {
+        const pt = polylineCoords[i];
+        const d = (pt[1] - driverLocation.latitude) ** 2 + (pt[0] - driverLocation.longitude) ** 2;
+        if (d < minD) {
+          minD = d;
+          currentPolylineIdx = i;
+        }
+      }
+    }
+
+    let activeIdx = 0;
+    if (stepPolylineIndices.length > 1) {
+      if (currentPolylineIdx === 0) {
+        activeIdx = 0;
+      } else {
+        for (let i = 1; i < activeSteps.length; i++) {
+          if (currentPolylineIdx <= stepPolylineIndices[i]) {
+            activeIdx = i;
+            break;
+          }
+          activeIdx = i;
+        }
+      }
+    }
+
+    const targetStep = activeSteps[activeIdx];
+    let dist = null;
+    if (targetStep?.location && targetStep.location.length >= 2) {
+      const R = 6371000;
+      const dLat = ((targetStep.location[1] - driverLocation.latitude) * Math.PI) / 180;
+      const dLon = ((targetStep.location[0] - driverLocation.longitude) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos((driverLocation.latitude * Math.PI) / 180) *
+          Math.cos((targetStep.location[1] * Math.PI) / 180) *
+          Math.sin(dLon / 2) ** 2;
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      dist = Math.round(R * c);
+    }
+
+    return {
+      stepIndex: activeIdx,
+      distanceMeters: dist,
+    };
+  }, [activeSteps, driverLocation, polylineCoords, stepPolylineIndices]);
+
+  const effectiveActiveStepIndex = activeStepIndex !== null && activeStepIndex !== undefined ? activeStepIndex : computedNav.stepIndex;
+  const effectiveDistanceMeters = currentDistanceMeters !== null && currentDistanceMeters !== undefined ? currentDistanceMeters : computedNav.distanceMeters;
 
   const { socket } = useSocket();
   const [socketDriverLocations, setSocketDriverLocations] = useState(new Map());
@@ -220,7 +349,7 @@ export function InteractiveMap({
           <div style="font-weight: 700; font-size: 13px; color: #0f172a;">${order.customerName}</div>
           <div style="color: #334155; margin-top: 3px;"><strong>Address:</strong> ${order.deliveryAddress}</div>
           <div style="color: #334155; margin-top: 2px;"><strong>Phone:</strong> ${order.customerPhone}</div>
-          <div style="color: #334155; margin-top: 2px;"><strong>Weight:</strong> ${order.weightKg} kg | <strong>Vol:</strong> ${order.volumeM3} m³</div>
+          <div style="color: #334155; margin-top: 2px;"><strong>Weight:</strong> ${order.weightKg} kg | <strong>Vol:</strong> ${order.volumeM3} m<sup>3</sup></div>
           <div style="margin-top: 6px; display: inline-block; padding: 2px 8px; border-radius: 9999px; font-weight: 600; font-size: 10px; background-color: ${getStatusColor(order.status)}18; color: ${getStatusColor(order.status)};">
             ${order.status}
           </div>
@@ -423,10 +552,13 @@ export function InteractiveMap({
   }, [driverLocation, followDriver]);
 
   return (
-    <div
-      ref={mapContainerRef}
-      className={`w-full h-full min-h-[300px] z-0 ${className}`}
-    />
+    <div className={`relative w-full h-full min-h-[300px] ${className}`}>
+      <div
+        ref={mapContainerRef}
+        className="w-full h-full z-0"
+      />
+      <TurnByTurnPanel steps={activeSteps} onStepClick={handleStepClick} activeStepIndex={effectiveActiveStepIndex} currentDistanceMeters={effectiveDistanceMeters} />
+    </div>
   );
 }
 
