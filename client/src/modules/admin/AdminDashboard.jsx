@@ -48,7 +48,7 @@ function formatDuration(min) {
 
 export function AdminDashboard() {
   const { user: currentUser, logout } = useAuth();
-  const { socket } = useSocket();
+  const { socket, isConnected } = useSocket();
 
   const [viewMode, setViewMode] = useState('admin');
   const [activeTab, setActiveTab] = useState('users');
@@ -337,6 +337,21 @@ export function AdminDashboard() {
             <span>Dispatcher Console</span>
             <ArrowRight className="h-3.5 w-3.5 text-zinc-400" />
           </button>
+
+          <div
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
+              isConnected
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : 'bg-rose-50 text-rose-700 border-rose-200'
+            }`}
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                isConnected ? 'bg-emerald-500' : 'bg-rose-500'
+              }`}
+            />
+            <span>{isConnected ? 'Online' : 'Offline'}</span>
+          </div>
 
           <button
             type="button"

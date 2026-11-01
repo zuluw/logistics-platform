@@ -91,6 +91,27 @@ export function LogisticsProvider({ children }) {
       setActiveRoute(assignedRoute);
     };
 
+    const handleRouteVehicleUpdated = (updatedRoute) => {
+      setActiveRoute((prev) => {
+        if (!prev || prev.id !== updatedRoute.id) return prev;
+        return {
+          ...prev,
+          vehicle: updatedRoute.vehicle,
+          vehicleId: updatedRoute.vehicleId,
+        };
+      });
+
+      setRoutes((prev) =>
+        prev.map((r) =>
+          r.id === updatedRoute.id
+            ? { ...r, vehicle: updatedRoute.vehicle, vehicleId: updatedRoute.vehicleId }
+            : r
+        )
+      );
+
+      fetchVehicles();
+    };
+
     const handleOrderStatusChanged = ({ routeId, pointId, status }) => {
       setRoutes((prev) =>
         prev.map((r) => {
@@ -129,11 +150,13 @@ export function LogisticsProvider({ children }) {
 
     socket.on('route:created', handleRouteCreated);
     socket.on('route:assigned', handleRouteAssigned);
+    socket.on('route:vehicle_updated', handleRouteVehicleUpdated);
     socket.on('order:status_changed', handleOrderStatusChanged);
 
     return () => {
       socket.off('route:created', handleRouteCreated);
       socket.off('route:assigned', handleRouteAssigned);
+      socket.off('route:vehicle_updated', handleRouteVehicleUpdated);
       socket.off('order:status_changed', handleOrderStatusChanged);
     };
   }, [socket, fetchOrders, fetchVehicles]);
@@ -162,6 +185,15 @@ export function LogisticsProvider({ children }) {
     return updated;
   }, []);
 
+  const reassignRouteVehicle = useCallback(
+    async (routeId, vehicleId) => {
+      const updated = await apiClient.patch(`/routes/${routeId}/vehicle`, { vehicleId });
+      await Promise.all([fetchRoutes(), fetchVehicles()]);
+      return updated;
+    },
+    [fetchRoutes, fetchVehicles]
+  );
+
   const value = useMemo(
     () => ({
       orders,
@@ -179,6 +211,7 @@ export function LogisticsProvider({ children }) {
       calculateRoute,
       createRoute,
       updatePointStatus,
+      reassignRouteVehicle,
     }),
     [
       orders,
@@ -196,6 +229,7 @@ export function LogisticsProvider({ children }) {
       calculateRoute,
       createRoute,
       updatePointStatus,
+      reassignRouteVehicle,
     ]
   );
 

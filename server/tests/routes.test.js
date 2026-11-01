@@ -105,4 +105,58 @@ describe('Routes Module API', () => {
     expect(res.body.data.id).toBe(mockActiveRoute.id);
     expect(res.body.data.status).toBe('ACTIVE');
   });
+
+  it('PATCH /api/routes/:id/vehicle reassigns route vehicle successfully', async () => {
+    const routeId = '123e4567-e89b-12d3-a456-426614174030';
+    const oldVehicleId = '123e4567-e89b-12d3-a456-426614174010';
+    const newVehicleId = '123e4567-e89b-12d3-a456-426614174099';
+
+    vi.spyOn(prisma.route, 'findUnique')
+      .mockResolvedValueOnce({
+        id: routeId,
+        vehicleId: oldVehicleId,
+        driverId,
+      })
+      .mockResolvedValueOnce({
+        id: routeId,
+        vehicleId: newVehicleId,
+        driverId,
+        vehicle: {
+          id: newVehicleId,
+          brand: 'Volvo FH16',
+          licensePlate: '9999-AX-7',
+        },
+        driver: {
+          id: driverId,
+          fullName: 'Ivan Ivanov',
+        },
+        dispatcher: {
+          id: '123e4567-e89b-12d3-a456-426614174090',
+        },
+        routePoints: [],
+      });
+
+    vi.spyOn(prisma.vehicle, 'findUnique').mockResolvedValue({
+      id: newVehicleId,
+      brand: 'Volvo FH16',
+      licensePlate: '9999-AX-7',
+      status: 'AVAILABLE',
+    });
+
+    vi.spyOn(prisma, '$transaction').mockImplementation(async (callback) => {
+      return callback({
+        vehicle: { update: vi.fn() },
+        route: { update: vi.fn() },
+      });
+    });
+
+    const res = await request(app)
+      .patch(`/api/routes/${routeId}/vehicle`)
+      .set('Authorization', `Bearer ${dispatcherToken}`)
+      .send({ vehicleId: newVehicleId });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.vehicleId).toBe(newVehicleId);
+  });
 });

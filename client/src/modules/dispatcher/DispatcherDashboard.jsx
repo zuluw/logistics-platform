@@ -8,7 +8,7 @@ import { OrdersListPanel } from './OrdersListPanel.jsx';
 import { VehiclesListPanel } from './VehiclesListPanel.jsx';
 import { RouteControlPanel } from './RouteControlPanel.jsx';
 import { CreateOrderModal } from './CreateOrderModal.jsx';
-import { Truck, LogOut, RefreshCw, Wifi, WifiOff, Package, Route as RouteIcon } from 'lucide-react';
+import { Truck, LogOut, RefreshCw, Package, Route as RouteIcon } from 'lucide-react';
 
 export function DispatcherDashboard({ onBackToAdmin } = {}) {
   const { user, logout } = useAuth();
@@ -89,10 +89,10 @@ export function DispatcherDashboard({ onBackToAdmin } = {}) {
     }
   };
 
-  const handleCreateRoute = async () => {
+  const handleCreateRoute = async (customDriverId) => {
     if (!previewRoute || !selectedVehicle) return;
 
-    const driverId = selectedVehicle.currentDriverId || selectedVehicle.currentDriver?.id;
+    const driverId = customDriverId || selectedVehicle.currentDriverId || selectedVehicle.currentDriver?.id;
     if (!driverId) {
       setRouteError('Selected vehicle has no assigned driver');
       return;
@@ -169,14 +169,18 @@ export function DispatcherDashboard({ onBackToAdmin } = {}) {
             </button>
           )}
           <div
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
               isConnected
                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                : 'bg-amber-50 text-amber-700 border-amber-200'
+                : 'bg-rose-50 text-rose-700 border-rose-200'
             }`}
           >
-            {isConnected ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
-            <span>{isConnected ? 'Realtime Connected' : 'Disconnected'}</span>
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                isConnected ? 'bg-emerald-500' : 'bg-rose-500'
+              }`}
+            />
+            <span>{isConnected ? 'Online' : 'Offline'}</span>
           </div>
 
           <Button
@@ -307,7 +311,8 @@ export function DispatcherDashboard({ onBackToAdmin } = {}) {
         <main className="flex-1 h-full relative z-0">
           <InteractiveMap
             orders={orders}
-            routes={routes}
+            routes={routes.filter((r) => r.status === 'ACTIVE')}
+            activeRoutes={routes.filter((r) => r.status === 'ACTIVE')}
             previewRoute={previewRoute}
             selectedOrderIds={selectedOrderIds}
             onMapClick={handleMapClick}

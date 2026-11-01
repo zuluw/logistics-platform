@@ -1,6 +1,12 @@
 import { Router } from 'express';
 import { routesController } from './routes.controller.js';
-import { calculateRouteSchema, createRouteSchema, updatePointStatusSchema, queryRouteSchema } from './routes.dto.js';
+import {
+  calculateRouteSchema,
+  createRouteSchema,
+  updatePointStatusSchema,
+  queryRouteSchema,
+  reassignRouteVehicleSchema,
+} from './routes.dto.js';
 import { validate, validateQuery } from '../../middlewares/validate.middleware.js';
 import { authMiddleware, roleGuard } from '../../middlewares/auth.middleware.js';
 
@@ -17,5 +23,7 @@ router.get('/', roleGuard('DISPATCHER', 'ADMIN'), validateQuery(queryRouteSchema
 router.get('/my', roleGuard('DRIVER'), routesController.getMyRoute);
 
 router.patch('/:id/points/:pointId', roleGuard('DRIVER', 'DISPATCHER'), validate(updatePointStatusSchema), routesController.updatePointStatus);
+
+router.patch('/:id/vehicle', roleGuard('DISPATCHER', 'ADMIN'), validate(reassignRouteVehicleSchema), routesController.reassignRouteVehicle);
 
 export default router;

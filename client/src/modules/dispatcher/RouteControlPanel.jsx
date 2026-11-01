@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react';
 import { Button } from '../../components/index.js';
-import { Route, Navigation, Clock, Scale, AlertTriangle, CheckCircle, RotateCcw } from 'lucide-react';
+import { Route, Navigation, Clock, AlertTriangle, CheckCircle, RotateCcw, User } from 'lucide-react';
+import { apiClient } from '../../api/client.js';
 
 export function RouteControlPanel({
   selectedVehicle,
@@ -12,6 +14,21 @@ export function RouteControlPanel({
   onCreateRoute,
   onClearPreview,
 }) {
+  const [drivers, setDrivers] = useState([]);
+  const [selectedDriverId, setSelectedDriverId] = useState('');
+
+  useEffect(() => {
+    apiClient
+      .get('/vehicles/drivers')
+      .then((res) => setDrivers(res?.data || res || []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const defaultDriverId = selectedVehicle?.currentDriverId || selectedVehicle?.currentDriver?.id || '';
+    setSelectedDriverId(defaultDriverId);
+  }, [selectedVehicle]);
+
   const totalWeight = selectedOrders.reduce((sum, o) => sum + (Number(o.weightKg) || 0), 0);
   const totalVolume = selectedOrders.reduce((sum, o) => sum + (Number(o.volumeM3) || 0), 0);
   const capacity = selectedVehicle ? selectedVehicle.capacityKg : 0;
@@ -24,10 +41,12 @@ export function RouteControlPanel({
     !isOverweight &&
     selectedVehicle.status === 'AVAILABLE';
 
+  const effectiveDriverId = selectedDriverId || selectedVehicle?.currentDriverId || selectedVehicle?.currentDriver?.id;
+
   const canCreate =
     previewRoute &&
     selectedVehicle &&
-    (selectedVehicle.currentDriverId || selectedVehicle.currentDriver?.id) &&
+    effectiveDriverId &&
     !isCreating;
 
   return (
@@ -64,10 +83,7 @@ export function RouteControlPanel({
             <div className="text-xs space-y-1">
               <div className="text-sm font-bold text-slate-900">{selectedVehicle.brand}</div>
               <div className="text-slate-600">
-                Driver: <strong className="text-slate-800">{selectedVehicle.currentDriver?.fullName || 'No Driver Assigned'}</strong>
-              </div>
-              <div className="text-slate-600">
-                Max Payload: <strong>{selectedVehicle.capacityKg} kg</strong> | Volume: <strong>{selectedVehicle.volumeM3} m³</strong>
+                Max Payload: <strong>{selectedVehicle.capacityKg} kg</strong> | Volume: <strong>{selectedVehicle.volumeM3} m3</strong>
               </div>
             </div>
           ) : (
@@ -76,6 +92,41 @@ export function RouteControlPanel({
             </p>
           )}
         </div>
+
+        {selectedVehicle && (
+          <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-3.5 space-y-2">
+            <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <span className="flex items-center gap-1.5">
+                <User className="h-3.5 w-3.5 text-slate-400" />
+                <span>Assigned Route Driver</span>
+              </span>
+              {selectedVehicle.currentDriver && (
+                <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                  Fleet Assigned
+                </span>
+              )}
+            </div>
+
+            <select
+              value={selectedDriverId}
+              onChange={(e) => setSelectedDriverId(e.target.value)}
+              className="w-full text-xs font-medium border border-slate-300 rounded-lg px-2.5 py-2 bg-white text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+            >
+              <option value="">-- Choose Assigned Driver --</option>
+              {drivers.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.fullName} {d.phone ? `(${d.phone})` : d.email ? `(${d.email})` : ''}
+                </option>
+              ))}
+            </select>
+
+            {!effectiveDriverId && (
+              <p className="text-[11px] text-amber-600 font-medium">
+                Vehicle has no driver attached. Select a driver above to dispatch this route.
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-3.5 space-y-3">
           <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -192,7 +243,7 @@ export function RouteControlPanel({
               </div>
             </div>
 
-            {!selectedVehicle?.currentDriverId && !selectedVehicle?.currentDriver?.id && (
+            {!effectiveDriverId && (
               <p className="text-xs text-rose-600 font-medium">
                 The selected vehicle does not have a driver assigned. Assign a driver before confirming.
               </p>
@@ -203,7 +254,7 @@ export function RouteControlPanel({
               className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-500"
               disabled={!canCreate}
               isLoading={isCreating}
-              onClick={onCreateRoute}
+              onClick={() => onCreateRoute(effectiveDriverId)}
             >
               <CheckCircle className="h-4 w-4" />
               <span>Confirm & Create Route</span>

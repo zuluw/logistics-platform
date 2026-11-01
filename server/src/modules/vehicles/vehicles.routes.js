@@ -15,6 +15,12 @@ router.get(
   vehiclesController.getVehicles,
 );
 
+router.get(
+  '/drivers',
+  roleGuard('DISPATCHER', 'ADMIN'),
+  vehiclesController.getDrivers,
+);
+
 router.get('/:id', roleGuard('DISPATCHER', 'ADMIN', 'DRIVER'), vehiclesController.getVehicleById);
 
 router.post(

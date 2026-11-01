@@ -22,7 +22,39 @@ async function assertDriverExists(driverId) {
   }
 }
 
+async function validateDriverAssignment(driverId, vehicleId = null) {
+  await assertDriverExists(driverId);
+
+  const activeRoute = await prisma.route.findFirst({
+    where: { driverId, status: 'ACTIVE' },
+  });
+
+  if (activeRoute && (!vehicleId || activeRoute.vehicleId !== vehicleId)) {
+    throw ApiError.badRequest(
+      'Driver is currently executing an active delivery route. Complete or cancel route before reassigning vehicle.'
+    );
+  }
+
+  const where = { currentDriverId: driverId };
+  if (vehicleId) {
+    where.NOT = { id: vehicleId };
+  }
+
+  await prisma.vehicle.updateMany({
+    where,
+    data: { currentDriverId: null },
+  });
+}
+
 export class VehiclesService {
+  async getDrivers() {
+    return prisma.user.findMany({
+      where: { role: 'DRIVER' },
+      select: DRIVER_SELECT,
+      orderBy: { fullName: 'asc' },
+    });
+  }
+
   async getVehicles({ status, search }) {
     const where = {};
 
@@ -59,7 +91,7 @@ export class VehiclesService {
 
   async createVehicle(data) {
     if (data.currentDriverId) {
-      await assertDriverExists(data.currentDriverId);
+      await validateDriverAssignment(data.currentDriverId);
     }
 
     return prisma.vehicle.create({
@@ -72,7 +104,7 @@ export class VehiclesService {
     await this.getVehicleById(id);
 
     if (data.currentDriverId) {
-      await assertDriverExists(data.currentDriverId);
+      await validateDriverAssignment(data.currentDriverId, id);
     }
 
     return prisma.vehicle.update({

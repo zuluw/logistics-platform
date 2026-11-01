@@ -2,6 +2,15 @@ import { vehiclesService } from './vehicles.service.js';
 import { ApiResponse } from '../../common/responses/apiResponse.js';
 
 export class VehiclesController {
+  async getDrivers(req, res, next) {
+    try {
+      const drivers = await vehiclesService.getDrivers();
+      return ApiResponse.ok(res, drivers);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getVehicles(req, res, next) {
     try {
       const vehicles = await vehiclesService.getVehicles(req.query);
