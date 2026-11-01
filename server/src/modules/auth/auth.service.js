@@ -95,6 +95,130 @@ export class AuthService {
 
     return user;
   }
+
+  async updateProfile(userId, { fullName, phone }) {
+    const data = {};
+    if (fullName !== undefined) {
+      data.fullName = fullName.trim();
+    }
+    if (phone !== undefined) {
+      data.phone = phone ? phone.trim() : null;
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data,
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        role: true,
+        phone: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return updatedUser;
+  }
+
+  async changePassword(userId, { currentPassword, newPassword }) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw ApiError.notFound('User not found');
+    }
+
+    const isCurrentValid = await bcrypt.compare(currentPassword, user.passwordHash);
+
+    if (!isCurrentValid) {
+      throw ApiError.badRequest('Invalid current password');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+
+    return { message: 'Password updated successfully' };
+  }
+
+  async getUserStats(userId, role) {
+    if (role === 'DRIVER') {
+      const [deliveredOrdersCount, completedRoutesCount, totalRoutesCount, distanceAgg] =
+        await Promise.all([
+          prisma.routePoint.count({
+            where: {
+              route: { driverId: userId },
+              order: { status: 'DELIVERED' },
+            },
+          }),
+          prisma.route.count({
+            where: {
+              driverId: userId,
+              status: 'COMPLETED',
+            },
+          }),
+          prisma.route.count({
+            where: {
+              driverId: userId,
+            },
+          }),
+          prisma.route.aggregate({
+            where: { driverId: userId },
+            _sum: { totalDistanceKm: true },
+          }),
+        ]);
+
+      const rawKm = distanceAgg._sum.totalDistanceKm || 0;
+      const totalDistanceKm = Math.round(rawKm * 10) / 10;
+
+      return {
+        role: 'DRIVER',
+        deliveredOrdersCount,
+        completedRoutesCount,
+        totalRoutesCount,
+        totalDistanceKm,
+      };
+    }
+
+    const [totalRoutesCount, completedRoutesCount, totalOrdersDistributed, distanceAgg] =
+      await Promise.all([
+        prisma.route.count({
+          where: { dispatcherId: userId },
+        }),
+        prisma.route.count({
+          where: {
+            dispatcherId: userId,
+            status: 'COMPLETED',
+          },
+        }),
+        prisma.routePoint.count({
+          where: {
+            route: { dispatcherId: userId },
+          },
+        }),
+        prisma.route.aggregate({
+          where: { dispatcherId: userId },
+          _sum: { totalDistanceKm: true },
+        }),
+      ]);
+
+    const rawKm = distanceAgg._sum.totalDistanceKm || 0;
+    const totalDistanceKm = Math.round(rawKm * 10) / 10;
+
+    return {
+      role: 'DISPATCHER',
+      totalRoutesCount,
+      completedRoutesCount,
+      totalOrdersDistributed,
+      totalDistanceKm,
+    };
+  }
 }
 
 export const authService = new AuthService();
