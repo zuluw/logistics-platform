@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Button } from '../../components/index.js';
-import { Route, Navigation, Clock, AlertTriangle, CheckCircle, RotateCcw, User } from 'lucide-react';
+import { Route, Navigation, Clock, AlertTriangle, CheckCircle, RotateCcw, User, Printer } from 'lucide-react';
 import { apiClient } from '../../api/client.js';
+import { printWaybill } from '../../utils/printWaybill.js';
 
 export function RouteControlPanel({
   selectedVehicle,
@@ -10,6 +11,9 @@ export function RouteControlPanel({
   isCalculating = false,
   isCreating = false,
   error = null,
+  routes = [],
+  lastCreatedRoute = null,
+  onDismissCreatedRoute,
   onCalculateRoute,
   onCreateRoute,
   onClearPreview,
@@ -49,6 +53,8 @@ export function RouteControlPanel({
     effectiveDriverId &&
     !isCreating;
 
+  const activeRoutesList = (routes || []).filter((r) => r.status === 'ACTIVE');
+
   return (
     <div className="flex flex-col h-full bg-white border-r border-slate-200">
       <div className="p-4 border-b border-slate-200">
@@ -69,6 +75,56 @@ export function RouteControlPanel({
           </div>
         )}
 
+        {lastCreatedRoute && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3.5 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-emerald-800">
+                <CheckCircle className="h-4 w-4 text-emerald-600" />
+                <span>Route Successfully Created</span>
+              </div>
+              {onDismissCreatedRoute && (
+                <button
+                  type="button"
+                  onClick={onDismissCreatedRoute}
+                  className="text-slate-400 hover:text-slate-600 text-sm font-bold leading-none cursor-pointer"
+                  title="Dismiss"
+                >
+                  &times;
+                </button>
+              )}
+            </div>
+
+            <div className="rounded-lg bg-white border border-emerald-100 p-2.5 space-y-1 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-900">
+                  {lastCreatedRoute.vehicle?.brand} ({lastCreatedRoute.vehicle?.licensePlate})
+                </span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-100 text-emerald-700">
+                  {lastCreatedRoute.status}
+                </span>
+              </div>
+              <div className="text-slate-600">
+                Driver: <span className="font-semibold text-slate-800">{lastCreatedRoute.driver?.fullName || 'Assigned'}</span>
+              </div>
+              <div className="text-[11px] text-slate-500">
+                {Number(lastCreatedRoute.totalDistanceKm || 0).toFixed(1)} km &bull; {lastCreatedRoute.totalDurationMin} min &bull; {(lastCreatedRoute.routePoints || []).length} stops
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full gap-1.5 text-xs border-emerald-300 text-emerald-800 hover:bg-emerald-100 bg-white"
+              onClick={() => printWaybill(lastCreatedRoute)}
+              title="Print Official Waybill"
+            >
+              <Printer className="h-3.5 w-3.5 text-emerald-700" />
+              <span>Print Waybill</span>
+            </Button>
+          </div>
+        )}
+
         <div className="rounded-lg border border-slate-200 bg-slate-50/50 p-3.5 space-y-2.5">
           <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-slate-500">
             <span>Selected Vehicle</span>
@@ -83,7 +139,7 @@ export function RouteControlPanel({
             <div className="text-xs space-y-1">
               <div className="text-sm font-bold text-slate-900">{selectedVehicle.brand}</div>
               <div className="text-slate-600">
-                Max Payload: <strong>{selectedVehicle.capacityKg} kg</strong> | Volume: <strong>{selectedVehicle.volumeM3} m3</strong>
+                Max Payload: <strong>{selectedVehicle.capacityKg} kg</strong> | Volume: <strong>{selectedVehicle.volumeM3} m³</strong>
               </div>
             </div>
           ) : (
@@ -249,16 +305,89 @@ export function RouteControlPanel({
               </p>
             )}
 
-            <Button
-              variant="primary"
-              className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-500"
-              disabled={!canCreate}
-              isLoading={isCreating}
-              onClick={() => onCreateRoute(effectiveDriverId)}
-            >
-              <CheckCircle className="h-4 w-4" />
-              <span>Confirm & Create Route</span>
-            </Button>
+            <div className="flex items-center gap-2 pt-1">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1 gap-1.5 text-xs border-indigo-200 text-indigo-700 hover:bg-indigo-50 bg-white"
+                onClick={() =>
+                  printWaybill({
+                    ...previewRoute,
+                    id: 'PREVIEW-ROUTE',
+                    routeDate: new Date(),
+                    vehicle: selectedVehicle,
+                    driver: drivers.find((d) => d.id === effectiveDriverId),
+                    dispatcher: { fullName: 'Logistics Dispatcher' },
+                  })
+                }
+                title="Print Waybill (PDF)"
+              >
+                <Printer className="h-3.5 w-3.5 text-indigo-600" />
+                <span>Print Waybill</span>
+              </Button>
+
+              <Button
+                variant="primary"
+                className="flex-1 gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-500"
+                disabled={!canCreate}
+                isLoading={isCreating}
+                onClick={() => onCreateRoute(effectiveDriverId)}
+              >
+                <CheckCircle className="h-3.5 w-3.5" />
+                <span>Confirm & Create</span>
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {activeRoutesList.length > 0 && (
+          <div className="space-y-3 pt-3 border-t border-slate-200">
+            <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-700">
+              <div className="flex items-center gap-1.5">
+                <Route className="h-3.5 w-3.5 text-slate-500" />
+                <span>Active Dispatched Routes ({activeRoutesList.length})</span>
+              </div>
+            </div>
+
+            <div className="space-y-2.5">
+              {activeRoutesList.map((route) => (
+                <div
+                  key={route.id}
+                  className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 space-y-2 transition-all hover:border-slate-300"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-900 truncate">
+                      {route.vehicle ? `${route.vehicle.brand} (${route.vehicle.licensePlate})` : 'Assigned Fleet'}
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-100 text-emerald-700 border border-emerald-200 shrink-0">
+                      {route.status}
+                    </span>
+                  </div>
+
+                  <div className="text-[11px] text-slate-600 space-y-0.5">
+                    <div>
+                      Driver: <span className="font-semibold text-slate-800">{route.driver?.fullName || 'Unassigned'}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-500 pt-0.5">
+                      <span>{Number(route.totalDistanceKm || 0).toFixed(1)} km &bull; {route.totalDurationMin} min</span>
+                      <span>{(route.routePoints || []).length} stops</span>
+                    </div>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full gap-1.5 text-xs text-slate-700 hover:text-slate-900 bg-white"
+                    onClick={() => printWaybill(route)}
+                    title="Print Waybill (PDF)"
+                  >
+                    <Printer className="h-3.5 w-3.5 text-slate-500" />
+                    <span>Print Waybill</span>
+                  </Button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

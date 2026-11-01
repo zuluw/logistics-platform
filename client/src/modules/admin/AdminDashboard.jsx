@@ -25,7 +25,9 @@ import {
   Clock,
   ArrowRight,
   Navigation,
+  Printer,
 } from 'lucide-react';
+import { printWaybill } from '../../utils/printWaybill.js';
 
 const ROUTE_COLORS = [
   '#2563eb',
@@ -842,18 +844,30 @@ export function AdminDashboard() {
                           })}
                         </span>
 
-                        <button
-                          type="button"
-                          onClick={() => setFocusedRoute(route)}
-                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
-                            isFocused
-                              ? 'bg-zinc-900 text-white'
-                              : 'border border-zinc-300 bg-white hover:bg-zinc-100 text-zinc-700'
-                          }`}
-                        >
-                          <MapPin className="h-3 w-3" />
-                          <span>{isFocused ? 'Focused' : 'Focus on Map'}</span>
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => printWaybill(route)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold border border-zinc-300 bg-white hover:bg-zinc-100 text-zinc-700 transition-colors cursor-pointer shadow-2xs"
+                            title="Print Waybill (PDF)"
+                          >
+                            <Printer className="h-3 w-3 text-zinc-500" />
+                            <span>Print Waybill</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setFocusedRoute(route)}
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                              isFocused
+                                ? 'bg-zinc-900 text-white'
+                                : 'border border-zinc-300 bg-white hover:bg-zinc-100 text-zinc-700'
+                            }`}
+                          >
+                            <MapPin className="h-3 w-3" />
+                            <span>{isFocused ? 'Focused' : 'Focus on Map'}</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
